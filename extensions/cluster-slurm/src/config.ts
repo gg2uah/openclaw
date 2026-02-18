@@ -53,6 +53,12 @@ function parseSlurmDefaults(value: unknown, field: string): SlurmHeader {
     return {};
   }
   const obj = asObject(value, field);
+  const gpus = readNumber(obj.gpus, `${field}.gpus`);
+  const gpusPerNode = readNumber(obj.gpusPerNode, `${field}.gpusPerNode`);
+  if (gpus != null && gpusPerNode != null) {
+    throw new Error(`${field} cannot set both gpus and gpusPerNode`);
+  }
+
   return {
     jobName: readString(obj.jobName, `${field}.jobName`),
     partition: readString(obj.partition, `${field}.partition`),
@@ -61,10 +67,12 @@ function parseSlurmDefaults(value: unknown, field: string): SlurmHeader {
     constraint: readString(obj.constraint, `${field}.constraint`),
     time: readString(obj.time, `${field}.time`),
     nodes: readNumber(obj.nodes, `${field}.nodes`),
+    ntasks: readNumber(obj.ntasks, `${field}.ntasks`),
     ntasksPerNode: readNumber(obj.ntasksPerNode, `${field}.ntasksPerNode`),
     cpusPerTask: readNumber(obj.cpusPerTask, `${field}.cpusPerTask`),
     mem: readString(obj.mem, `${field}.mem`),
-    gpus: readNumber(obj.gpus, `${field}.gpus`),
+    gpus,
+    gpusPerNode,
     gres: readString(obj.gres, `${field}.gres`),
     output: readString(obj.output, `${field}.output`),
     error: readString(obj.error, `${field}.error`),

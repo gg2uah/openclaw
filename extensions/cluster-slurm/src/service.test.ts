@@ -73,6 +73,11 @@ describe("cluster-slurm service", () => {
 
     const { runner, calls } = createMockRunner();
     const service = new ClusterSlurmService({ config: cfg, workspaceDir: workspace, runner });
+    const listed = service.listClusters();
+    expect(listed.clusters[0]?.id).toBe("gautschi");
+    expect(
+      (listed.clusters[0]?.slurmDefaults as { partition?: string } | undefined)?.partition,
+    ).toBe("gpu");
 
     const init = await service.createRun({ prefix: "paper-repl" });
     expect(init.run.runId).toMatch(/^paper-repl-/);

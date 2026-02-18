@@ -17,7 +17,9 @@ describe("slurm rendering", () => {
       header: {
         jobName: "demo",
         partition: "gpu",
+        ntasks: 1,
         cpusPerTask: 2,
+        gpusPerNode: 1,
         modules: ["python/3.11"],
       },
       env: { OMP_NUM_THREADS: "2" },
@@ -28,7 +30,9 @@ describe("slurm rendering", () => {
 
     expect(script).toContain("#SBATCH --job-name=demo");
     expect(script).toContain("#SBATCH --partition=gpu");
+    expect(script).toContain("#SBATCH --ntasks=1");
     expect(script).toContain("#SBATCH --cpus-per-task=2");
+    expect(script).toContain("#SBATCH --gpus-per-node=1");
     expect(script).toContain("export OMP_NUM_THREADS='2'");
     expect(script).toContain("module load python/3.11");
     expect(script).toContain("module load cuda/12");
@@ -44,5 +48,17 @@ describe("job id parsing", () => {
 
   it("parses fallback numeric output", () => {
     expect(parseSubmittedJobId("job 777777 accepted")).toBe("777777");
+  });
+
+  it("rejects ambiguous GPU directives", () => {
+    expect(() =>
+      renderSlurmScript({
+        header: {
+          gpus: 1,
+          gpusPerNode: 1,
+        },
+        commands: ["echo hello"],
+      }),
+    ).toThrow(/either gpus or gpusPerNode/);
   });
 });

@@ -14,6 +14,17 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 - Keep local machine for orchestration, code edits, and result inspection.
 - Use run-scoped directories and keep artifacts reproducible.
 - Prefer explicit status updates with job IDs and paths.
+- If resource intent is unclear (CPU vs GPU), ask once before submitting.
+
+## Cluster selection
+
+- Start with `cluster_slurm` `list_clusters` to see available profiles.
+- Choose profile by resource intent:
+  - CPU workflows: choose `*-cpu` (or default profile).
+  - GPU workflows: choose `*-gpu` (or profile with GPU defaults like
+    `gpusPerNode`/`gres`).
+- Keep account/partition policy in profile config; avoid ad-hoc overrides unless
+  the user explicitly asks.
 
 ## Standard sequence
 

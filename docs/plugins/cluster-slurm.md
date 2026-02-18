@@ -42,26 +42,45 @@ Then configure it under `plugins.entries.cluster-slurm.config`.
       "cluster-slurm": {
         "enabled": true,
         "config": {
-          "defaultCluster": "gautschi",
+          "defaultCluster": "gautschi-cpu",
           "localRunsDir": ".openclaw/cluster-runs",
           "clusters": {
-            "gautschi": {
+            "gautschi-cpu": {
               "sshTarget": "gautschi",
               "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
               "setupCommands": ["source ~/.bashrc"],
               "slurmDefaults": {
-                "partition": "gpu",
-                "account": "my-allocation",
+                "partition": "cpu",
+                "account": "lilly-agentic-cpu",
                 "time": "02:00:00",
                 "nodes": 1,
                 "ntasksPerNode": 1,
                 "cpusPerTask": 4,
-                "mem": "16G",
-                "gpus": 1,
+                "mem": "8G",
                 "output": "slurm-%j.out",
                 "error": "slurm-%j.err",
                 "modules": ["python/3.11"]
+              }
+            },
+            "gautschi-gpu": {
+              "sshTarget": "gautschi",
+              "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
+              "scheduler": "slurm",
+              "setupCommands": ["source ~/.bashrc"],
+              "slurmDefaults": {
+                "partition": "ai",
+                "account": "lilly-ibil",
+                "qos": "normal",
+                "time": "04:00:00",
+                "nodes": 1,
+                "ntasks": 1,
+                "cpusPerTask": 14,
+                "gpusPerNode": 1,
+                "mem": "16G",
+                "output": "slurm-%j.out",
+                "error": "slurm-%j.err",
+                "modules": ["modtree/gpu"]
               }
             }
           }
@@ -75,6 +94,17 @@ Then configure it under `plugins.entries.cluster-slurm.config`.
 For Gautschi, set `remoteRoot` to your scratch path (for example
 `/scratch/gautschi/<username>/openclaw-runs`) so compute I/O and artifacts land
 on scratch by default.
+
+Recommended selection pattern:
+
+- Default to `gautschi-cpu`.
+- Use `gautschi-gpu` for GPU workloads.
+
+This keeps account/partition policy in config and avoids brittle prompt-only
+routing.
+
+Note: if your site does not allow `--gpus=<n>`, set `gpusPerNode` (or `gres`)
+in `slurmDefaults`.
 
 ## Enable the optional tool
 

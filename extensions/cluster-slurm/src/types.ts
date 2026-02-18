@@ -6,10 +6,12 @@ export type SlurmHeader = {
   constraint?: string;
   time?: string;
   nodes?: number;
+  ntasks?: number;
   ntasksPerNode?: number;
   cpusPerTask?: number;
   mem?: string;
   gpus?: number;
+  gpusPerNode?: number;
   gres?: string;
   output?: string;
   error?: string;

@@ -38,6 +38,9 @@ export function renderSlurmScript(params: {
 
   const lines: string[] = ["#!/bin/bash"];
   const h = params.header;
+  if (h.gpus != null && h.gpusPerNode != null) {
+    throw new Error("Set either gpus or gpusPerNode, not both");
+  }
 
   lines.push(...formatDirective("job-name", h.jobName));
   lines.push(...formatDirective("partition", h.partition));
@@ -46,10 +49,12 @@ export function renderSlurmScript(params: {
   lines.push(...formatDirective("constraint", h.constraint));
   lines.push(...formatDirective("time", h.time));
   lines.push(...formatDirective("nodes", h.nodes));
+  lines.push(...formatDirective("ntasks", h.ntasks));
   lines.push(...formatDirective("ntasks-per-node", h.ntasksPerNode));
   lines.push(...formatDirective("cpus-per-task", h.cpusPerTask));
   lines.push(...formatDirective("mem", h.mem));
   lines.push(...formatDirective("gpus", h.gpus));
+  lines.push(...formatDirective("gpus-per-node", h.gpusPerNode));
   lines.push(...formatDirective("gres", h.gres));
   lines.push(...formatDirective("output", h.output));
   lines.push(...formatDirective("error", h.error));
