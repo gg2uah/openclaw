@@ -25,7 +25,7 @@ Features:
           "clusters": {
             "gautschi": {
               "sshTarget": "gautschi",
-              "remoteRoot": "~/agentic-labs/runs",
+              "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
               "submitArgs": [],
               "setupCommands": ["source ~/.bashrc"],
@@ -50,6 +50,10 @@ Features:
   }
 }
 ```
+
+For Gautschi, set `remoteRoot` to your scratch path (for example
+`/scratch/gautschi/<username>/openclaw-runs`). Keep this as an absolute path so
+all uploads, scripts, logs, and outputs stay on scratch by default.
 
 ## Tool
 

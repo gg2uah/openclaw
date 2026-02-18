@@ -15,7 +15,7 @@
     },
     "clusters": {
       "label": "Cluster Profiles",
-      "help": "Map of cluster id -> SSH and SLURM defaults."
+      "help": "Map of cluster id -> SSH and SLURM defaults. Use an absolute scratch path for remoteRoot on HPC clusters."
     }
   },
   "configSchema": {

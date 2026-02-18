@@ -47,7 +47,7 @@ Then configure it under `plugins.entries.cluster-slurm.config`.
           "clusters": {
             "gautschi": {
               "sshTarget": "gautschi",
-              "remoteRoot": "~/agentic-labs/runs",
+              "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
               "setupCommands": ["source ~/.bashrc"],
               "slurmDefaults": {
@@ -71,6 +71,10 @@ Then configure it under `plugins.entries.cluster-slurm.config`.
   }
 }
 ```
+
+For Gautschi, set `remoteRoot` to your scratch path (for example
+`/scratch/gautschi/<username>/openclaw-runs`) so compute I/O and artifacts land
+on scratch by default.
 
 ## Enable the optional tool
 
