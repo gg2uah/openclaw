@@ -45,6 +45,7 @@ Looking for third-party listings? See [Community plugins](/plugins/community).
 - Memory (Core) — bundled memory search plugin (enabled by default via `plugins.slots.memory`)
 - Memory (LanceDB) — bundled long-term memory plugin (auto-recall/capture; set `plugins.slots.memory = "memory-lancedb"`)
 - [Voice Call](/plugins/voice-call) — `@openclaw/voice-call`
+- [Cluster SLURM](/plugins/cluster-slurm) — bundled as `cluster-slurm` (disabled by default)
 - [Zalo Personal](/plugins/zalouser) — `@openclaw/zalouser`
 - [Matrix](/channels/matrix) — `@openclaw/matrix`
 - [Nostr](/channels/nostr) — `@openclaw/nostr`
