@@ -15,7 +15,7 @@
     },
     "clusters": {
       "label": "Cluster Profiles",
-      "help": "Map of cluster id -> SSH and SLURM defaults. Use an absolute scratch path for remoteRoot on HPC clusters."
+      "help": "Map of cluster id -> SSH and SLURM defaults. Use separate CPU/GPU profiles when account/partition policies differ, and keep remoteRoot on scratch."
     }
   },
   "configSchema": {
@@ -52,10 +52,12 @@
                 "constraint": { "type": "string" },
                 "time": { "type": "string" },
                 "nodes": { "type": "integer", "minimum": 1 },
+                "ntasks": { "type": "integer", "minimum": 1 },
                 "ntasksPerNode": { "type": "integer", "minimum": 1 },
                 "cpusPerTask": { "type": "integer", "minimum": 1 },
                 "mem": { "type": "string" },
                 "gpus": { "type": "integer", "minimum": 1 },
+                "gpusPerNode": { "type": "integer", "minimum": 1 },
                 "gres": { "type": "string" },
                 "output": { "type": "string" },
                 "error": { "type": "string" },

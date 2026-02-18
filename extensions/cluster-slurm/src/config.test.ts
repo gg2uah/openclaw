@@ -18,7 +18,7 @@ describe("cluster-slurm config", () => {
           slurmDefaults: {
             partition: "gpu",
             time: "01:00:00",
-            gpus: 1,
+            gpusPerNode: 1,
           },
         },
       },
@@ -27,7 +27,25 @@ describe("cluster-slurm config", () => {
     expect(cfg.defaultCluster).toBe("gautschi");
     expect(cfg.clusters.gautschi?.sshTarget).toBe("gautschi");
     expect(cfg.clusters.gautschi?.slurmDefaults.partition).toBe("gpu");
+    expect(cfg.clusters.gautschi?.slurmDefaults.gpusPerNode).toBe(1);
     expect(cfg.clusters.gautschi?.pythonCommand).toBe("python3");
+  });
+
+  it("fails when both gpus and gpusPerNode are set", () => {
+    expect(() =>
+      parseClusterSlurmConfig({
+        clusters: {
+          gautschi: {
+            sshTarget: "gautschi",
+            remoteRoot: "~/runs",
+            slurmDefaults: {
+              gpus: 1,
+              gpusPerNode: 1,
+            },
+          },
+        },
+      }),
+    ).toThrow(/both gpus and gpusPerNode/);
   });
 
   it("fails when defaultCluster points to missing profile", () => {

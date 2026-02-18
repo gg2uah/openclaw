@@ -20,27 +20,47 @@ Features:
       "cluster-slurm": {
         "enabled": true,
         "config": {
-          "defaultCluster": "gautschi",
+          "defaultCluster": "gautschi-cpu",
           "localRunsDir": ".openclaw/cluster-runs",
           "clusters": {
-            "gautschi": {
+            "gautschi-cpu": {
               "sshTarget": "gautschi",
               "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
               "submitArgs": [],
               "setupCommands": ["source ~/.bashrc"],
               "slurmDefaults": {
-                "partition": "gpu",
-                "account": "your-account",
+                "partition": "cpu",
+                "account": "lilly-agentic-cpu",
                 "time": "02:00:00",
                 "nodes": 1,
                 "ntasksPerNode": 1,
                 "cpusPerTask": 4,
-                "mem": "16G",
-                "gpus": 1,
+                "mem": "8G",
                 "output": "slurm-%j.out",
                 "error": "slurm-%j.err",
                 "modules": ["python/3.11"]
+              }
+            },
+            "gautschi-gpu": {
+              "sshTarget": "gautschi",
+              "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
+              "scheduler": "slurm",
+              "submitArgs": [],
+              "setupCommands": ["source ~/.bashrc"],
+              "slurmDefaults": {
+                "partition": "ai",
+                "account": "lilly-ibil",
+                "qos": "normal",
+                "time": "04:00:00",
+                "nodes": 1,
+                "ntasks": 1,
+                "cpusPerTask": 14,
+                "gpusPerNode": 1,
+                "mem": "16G",
+                "output": "slurm-%j.out",
+                "error": "slurm-%j.err",
+                "modules": ["modtree/gpu"]
               }
             }
           }
@@ -54,6 +74,17 @@ Features:
 For Gautschi, set `remoteRoot` to your scratch path (for example
 `/scratch/gautschi/<username>/openclaw-runs`). Keep this as an absolute path so
 all uploads, scripts, logs, and outputs stay on scratch by default.
+
+Why two profiles:
+
+- `gautschi-cpu`: default for CPU-only jobs
+- `gautschi-gpu`: GPU jobs under `lilly-ibil` on `ai`
+
+This keeps scheduling policy in config (not hardcoded in prompts/tool logic) and
+makes it easy to add more clusters later.
+
+Note: some clusters require GPU-per-node syntax. Use `gpusPerNode` (or `gres`)
+instead of `gpus` when required by the site policy.
 
 ## Tool
 

@@ -104,6 +104,7 @@ export class ClusterSlurmService {
       sshTarget: cluster.sshTarget,
       remoteRoot: cluster.remoteRoot,
       scheduler: cluster.scheduler,
+      slurmDefaults: cluster.slurmDefaults,
     }));
 
     return {
