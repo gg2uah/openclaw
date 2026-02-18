@@ -1,0 +1,74 @@
+{
+  "id": "cluster-slurm",
+  "name": "Cluster SLURM",
+  "description": "Run reproducible SLURM jobs over SSH (upload, submit, status, logs, download).",
+  "skills": ["./skills"],
+  "uiHints": {
+    "defaultCluster": {
+      "label": "Default Cluster",
+      "help": "Cluster id used when the tool call omits cluster."
+    },
+    "localRunsDir": {
+      "label": "Local Runs Directory",
+      "help": "Workspace-relative path for run ledger and generated job files.",
+      "placeholder": ".openclaw/cluster-runs"
+    },
+    "clusters": {
+      "label": "Cluster Profiles",
+      "help": "Map of cluster id -> SSH and SLURM defaults."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultCluster": { "type": "string" },
+      "localRunsDir": { "type": "string" },
+      "clusters": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sshTarget": { "type": "string" },
+            "remoteRoot": { "type": "string" },
+            "scheduler": { "type": "string", "enum": ["slurm"] },
+            "pythonCommand": { "type": "string" },
+            "submitArgs": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "setupCommands": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "slurmDefaults": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "partition": { "type": "string" },
+                "account": { "type": "string" },
+                "qos": { "type": "string" },
+                "constraint": { "type": "string" },
+                "time": { "type": "string" },
+                "nodes": { "type": "integer", "minimum": 1 },
+                "ntasksPerNode": { "type": "integer", "minimum": 1 },
+                "cpusPerTask": { "type": "integer", "minimum": 1 },
+                "mem": { "type": "string" },
+                "gpus": { "type": "integer", "minimum": 1 },
+                "gres": { "type": "string" },
+                "output": { "type": "string" },
+                "error": { "type": "string" },
+                "modules": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["sshTarget", "remoteRoot"]
+        }
+      }
+    }
+  }
+}

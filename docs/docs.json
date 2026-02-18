@@ -1002,7 +1002,12 @@
               },
               {
                 "group": "Extensions",
-                "pages": ["plugins/community", "plugins/voice-call", "plugins/zalouser"]
+                "pages": [
+                  "plugins/community",
+                  "plugins/cluster-slurm",
+                  "plugins/voice-call",
+                  "plugins/zalouser"
+                ]
               },
               {
                 "group": "Automation",
