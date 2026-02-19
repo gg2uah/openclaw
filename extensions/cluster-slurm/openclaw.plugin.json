@@ -15,7 +15,11 @@
     },
     "clusters": {
       "label": "Cluster Profiles",
-      "help": "Map of cluster id -> SSH and SLURM defaults. Use separate CPU/GPU profiles when account/partition policies differ, and keep remoteRoot on scratch."
+      "help": "Map of cluster id -> SSH and SLURM defaults. Use separate CPU/GPU profiles when account/partition policies differ, keep remoteRoot on scratch, and set moduleInitScripts/setupCommands for reproducible runtime bootstrapping."
+    },
+    "routing": {
+      "label": "Routing",
+      "help": "Profile selection policy for natural workload requests. Default to CPU and route to GPU when task signals indicate GPU requirements."
     }
   },
   "configSchema": {
@@ -33,12 +37,17 @@
             "sshTarget": { "type": "string" },
             "remoteRoot": { "type": "string" },
             "scheduler": { "type": "string", "enum": ["slurm"] },
+            "loginShell": { "type": "boolean" },
             "pythonCommand": { "type": "string" },
             "submitArgs": {
               "type": "array",
               "items": { "type": "string" }
             },
             "setupCommands": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "moduleInitScripts": {
               "type": "array",
               "items": { "type": "string" }
             },
@@ -69,6 +78,23 @@
             }
           },
           "required": ["sshTarget", "remoteRoot"]
+        }
+      },
+      "routing": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "defaultProfile": { "type": "string" },
+          "gpuProfile": { "type": "string" },
+          "gpuIndicators": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "autoFallbackToGpuOnSignatures": { "type": "boolean" },
+          "gpuRequiredErrorSignatures": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
         }
       }
     }

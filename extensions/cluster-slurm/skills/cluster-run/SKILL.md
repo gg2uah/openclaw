@@ -14,7 +14,10 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 - Keep local machine for orchestration, code edits, and result inspection.
 - Use run-scoped directories and keep artifacts reproducible.
 - Prefer explicit status updates with job IDs and paths.
-- If resource intent is unclear (CPU vs GPU), ask once before submitting.
+- Use routing defaults for CPU vs GPU; only ask when signals are ambiguous and high-risk.
+- `run_workload` is profile-managed for environment bootstrap and rejects
+  call-level `setupCommands`/`modules`; use low-level `render_job` with
+  `allowEnvOverrides=true` only for explicit debugging.
 
 ## Cluster selection
 
@@ -28,13 +31,12 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 
 ## Standard sequence
 
-1. `cluster_slurm` `init_run`
-2. `cluster_slurm` `upload`
-3. `cluster_slurm` `render_job`
-4. `cluster_slurm` `submit_job`
-5. Poll via `cluster_slurm` `job_status`
-6. Inspect `cluster_slurm` `job_logs`
-7. Retrieve artifacts via `cluster_slurm` `download`
+1. `cluster_slurm` `run_workload` (non-blocking submit)
+2. `cluster_slurm` `check_workload`
+3. `cluster_slurm` `fetch_workload_logs`
+4. `cluster_slurm` `download_workload_outputs`
+
+Low-level sequence (`init_run/upload/render_job/submit_job/...`) is still valid for debugging.
 
 ## Prompting template (for user messages)
 

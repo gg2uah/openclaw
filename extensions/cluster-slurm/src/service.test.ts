@@ -60,7 +60,8 @@ describe("cluster-slurm service", () => {
         gautschi: {
           sshTarget: "gautschi",
           remoteRoot: "~/runs",
-          setupCommands: ["source ~/.bashrc"],
+          moduleInitScripts: ["/etc/profile.d/modules.sh"],
+          setupCommands: ["module load modtree/gpu"],
           slurmDefaults: {
             partition: "gpu",
             time: "00:30:00",
@@ -78,6 +79,8 @@ describe("cluster-slurm service", () => {
     expect(
       (listed.clusters[0]?.slurmDefaults as { partition?: string } | undefined)?.partition,
     ).toBe("gpu");
+    expect((listed.clusters[0] as { loginShell?: boolean } | undefined)?.loginShell).toBe(false);
+    expect(listed.routing.defaultProfile).toBe("gautschi");
 
     const init = await service.createRun({ prefix: "paper-repl" });
     expect(init.run.runId).toMatch(/^paper-repl-/);
@@ -149,5 +152,40 @@ describe("cluster-slurm service", () => {
         localPath: "../escape.txt",
       }),
     ).rejects.toThrow(/inside workspace/);
+  });
+
+  it("rejects cross-cluster run usage", async () => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "cluster-slurm-cluster-guard-"));
+    tmpDirs.push(workspace);
+
+    const cfg = parseClusterSlurmConfig({
+      defaultCluster: "cpu",
+      clusters: {
+        cpu: {
+          sshTarget: "gautschi",
+          remoteRoot: "~/runs/cpu",
+        },
+        gpu: {
+          sshTarget: "gautschi",
+          remoteRoot: "~/runs/gpu",
+        },
+      },
+      routing: {
+        defaultProfile: "cpu",
+        gpuProfile: "gpu",
+      },
+    });
+
+    const { runner } = createMockRunner();
+    const service = new ClusterSlurmService({ config: cfg, workspaceDir: workspace, runner });
+    const init = await service.createRun({ cluster: "cpu", prefix: "guard" });
+
+    await expect(
+      service.renderJob({
+        cluster: "gpu",
+        runId: init.run.runId,
+        commands: ["echo hi"],
+      }),
+    ).rejects.toThrow(/belongs to cluster/);
   });
 });

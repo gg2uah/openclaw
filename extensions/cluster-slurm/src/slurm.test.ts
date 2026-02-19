@@ -36,8 +36,42 @@ describe("slurm rendering", () => {
     expect(script).toContain("export OMP_NUM_THREADS='2'");
     expect(script).toContain("module load python/3.11");
     expect(script).toContain("module load cuda/12");
+    expect(script).toContain("if ! type module >/dev/null 2>&1; then");
+    expect(script).toContain("openclaw: module command unavailable");
     expect(script).toContain("echo setup");
     expect(script).toContain("python3 run.py");
+  });
+
+  it("bootstraps module command when setup commands use module without slurmDefaults.modules", () => {
+    const script = renderSlurmScript({
+      header: {},
+      setupCommands: ["module use $HOME/privatemodules", "module load conda-env/openclaw"],
+      commands: ["python3 run.py"],
+    });
+
+    expect(script).toContain("if ! type module >/dev/null 2>&1; then");
+    expect(script).toContain("module use $HOME/privatemodules");
+    expect(script).toContain("module load conda-env/openclaw");
+  });
+
+  it("supports profile-specific module init scripts", () => {
+    const script = renderSlurmScript({
+      header: { modules: ["modtree/gpu"] },
+      moduleInitScripts: ["/custom/modules.sh"],
+      commands: ["python3 run.py"],
+    });
+
+    expect(script).toContain("for __openclaw_mod_init in '/custom/modules.sh'; do");
+    expect(script).toContain("module load modtree/gpu");
+  });
+
+  it("supports login-shell shebang for clusters that need profile initialization", () => {
+    const script = renderSlurmScript({
+      header: {},
+      loginShell: true,
+      commands: ["python3 run.py"],
+    });
+    expect(script.startsWith("#!/bin/bash -l\n")).toBe(true);
   });
 });
 

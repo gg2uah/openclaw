@@ -1,3 +1,4 @@
+import { DEFAULT_GPU_INDICATORS, DEFAULT_GPU_REQUIRED_ERROR_SIGNATURES } from "./routing.js";
 import type { ClusterProfile, ClusterSlurmConfig, SlurmHeader } from "./types.js";
 
 const DEFAULT_LOCAL_RUNS_DIR = ".openclaw/cluster-runs";
@@ -28,6 +29,16 @@ function readNumber(value: unknown, field: string): number | undefined {
     throw new Error(`${field} must be a positive number`);
   }
   return Math.floor(value);
+}
+
+function readBoolean(value: unknown, field: string): boolean | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(`${field} must be a boolean`);
+  }
+  return value;
 }
 
 function readStringArray(value: unknown, field: string): string[] {
@@ -102,9 +113,11 @@ function parseCluster(id: string, value: unknown): ClusterProfile {
     sshTarget,
     remoteRoot,
     scheduler,
+    loginShell: readBoolean(obj.loginShell, `${base}.loginShell`) ?? false,
     pythonCommand: readString(obj.pythonCommand, `${base}.pythonCommand`) ?? "python3",
     submitArgs: readStringArray(obj.submitArgs, `${base}.submitArgs`),
     setupCommands: readStringArray(obj.setupCommands, `${base}.setupCommands`),
+    moduleInitScripts: readStringArray(obj.moduleInitScripts, `${base}.moduleInitScripts`),
     slurmDefaults: parseSlurmDefaults(obj.slurmDefaults, `${base}.slurmDefaults`),
   };
 }
@@ -114,6 +127,11 @@ export function parseClusterSlurmConfig(value: unknown): ClusterSlurmConfig {
     return {
       localRunsDir: DEFAULT_LOCAL_RUNS_DIR,
       clusters: {},
+      routing: {
+        gpuIndicators: [...DEFAULT_GPU_INDICATORS],
+        autoFallbackToGpuOnSignatures: true,
+        gpuRequiredErrorSignatures: [...DEFAULT_GPU_REQUIRED_ERROR_SIGNATURES],
+      },
     };
   }
 
@@ -136,11 +154,59 @@ export function parseClusterSlurmConfig(value: unknown): ClusterSlurmConfig {
     );
   }
 
+  const routingObj = obj.routing == null ? undefined : asObject(obj.routing, "routing");
+  const routingDefaultProfile = readString(routingObj?.defaultProfile, "routing.defaultProfile");
+  if (routingDefaultProfile && defaultCluster && routingDefaultProfile !== defaultCluster) {
+    throw new Error(
+      `routing.defaultProfile "${routingDefaultProfile}" must match defaultCluster "${defaultCluster}" when both are set`,
+    );
+  }
+
+  const effectiveDefaultProfile = routingDefaultProfile ?? defaultCluster;
+  if (effectiveDefaultProfile && !clusters[effectiveDefaultProfile]) {
+    throw new Error(
+      `routing.defaultProfile "${effectiveDefaultProfile}" does not exist in clusters (${Object.keys(clusters).join(", ") || "none"})`,
+    );
+  }
+
+  const gpuProfile = readString(routingObj?.gpuProfile, "routing.gpuProfile");
+  if (gpuProfile && !clusters[gpuProfile]) {
+    throw new Error(
+      `routing.gpuProfile "${gpuProfile}" does not exist in clusters (${Object.keys(clusters).join(", ") || "none"})`,
+    );
+  }
+
+  const gpuIndicatorsRaw = readStringArray(routingObj?.gpuIndicators, "routing.gpuIndicators");
+  const gpuIndicators =
+    gpuIndicatorsRaw.length > 0 ? gpuIndicatorsRaw : [...DEFAULT_GPU_INDICATORS];
+
+  const autoFallbackToGpuOnSignatures =
+    readBoolean(
+      routingObj?.autoFallbackToGpuOnSignatures,
+      "routing.autoFallbackToGpuOnSignatures",
+    ) ?? true;
+
+  const fallbackSignaturesRaw = readStringArray(
+    routingObj?.gpuRequiredErrorSignatures,
+    "routing.gpuRequiredErrorSignatures",
+  );
+  const gpuRequiredErrorSignatures =
+    fallbackSignaturesRaw.length > 0
+      ? fallbackSignaturesRaw
+      : [...DEFAULT_GPU_REQUIRED_ERROR_SIGNATURES];
+
   const localRunsDir = readString(obj.localRunsDir, "localRunsDir") ?? DEFAULT_LOCAL_RUNS_DIR;
 
   return {
     defaultCluster,
     localRunsDir,
     clusters,
+    routing: {
+      defaultProfile: effectiveDefaultProfile,
+      gpuProfile,
+      gpuIndicators,
+      autoFallbackToGpuOnSignatures,
+      gpuRequiredErrorSignatures,
+    },
   };
 }
