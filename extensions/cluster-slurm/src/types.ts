@@ -23,9 +23,11 @@ export type ClusterProfile = {
   sshTarget: string;
   remoteRoot: string;
   scheduler: "slurm";
+  loginShell: boolean;
   pythonCommand: string;
   submitArgs: string[];
   setupCommands: string[];
+  moduleInitScripts: string[];
   slurmDefaults: SlurmHeader;
 };
 
@@ -33,6 +35,15 @@ export type ClusterSlurmConfig = {
   defaultCluster?: string;
   localRunsDir: string;
   clusters: Record<string, ClusterProfile>;
+  routing: ClusterRoutingConfig;
+};
+
+export type ClusterRoutingConfig = {
+  defaultProfile?: string;
+  gpuProfile?: string;
+  gpuIndicators: string[];
+  autoFallbackToGpuOnSignatures: boolean;
+  gpuRequiredErrorSignatures: string[];
 };
 
 export type ClusterRunJob = {

@@ -5,6 +5,7 @@ Run reproducible SLURM jobs over SSH from OpenClaw.
 Features:
 
 - Cluster profiles (Gautschi now, Bell/others later)
+- Config-driven CPU/GPU routing for natural workload requests
 - Run-scoped ledger (local + remote paths, job IDs)
 - File upload/download via SCP
 - SLURM script rendering with defaults + overrides
@@ -21,14 +22,26 @@ Features:
         "enabled": true,
         "config": {
           "defaultCluster": "gautschi-cpu",
+          "routing": {
+            "defaultProfile": "gautschi-cpu",
+            "gpuProfile": "gautschi-gpu",
+            "gpuIndicators": ["torch.cuda", "--device cuda", "jax[cuda]", "tensorflow-gpu"],
+            "autoFallbackToGpuOnSignatures": true
+          },
           "localRunsDir": ".openclaw/cluster-runs",
           "clusters": {
             "gautschi-cpu": {
               "sshTarget": "gautschi",
               "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
+              "loginShell": true,
               "submitArgs": [],
-              "setupCommands": ["source ~/.bashrc"],
+              "moduleInitScripts": [
+                "/etc/profile",
+                "/etc/profile.d/modules.sh",
+                "/usr/share/lmod/lmod/init/bash"
+              ],
+              "setupCommands": ["module --force purge", "module load rcac"],
               "slurmDefaults": {
                 "partition": "cpu",
                 "account": "lilly-agentic-cpu",
@@ -46,8 +59,19 @@ Features:
               "sshTarget": "gautschi",
               "remoteRoot": "/scratch/gautschi/<username>/openclaw-runs",
               "scheduler": "slurm",
+              "loginShell": true,
               "submitArgs": [],
-              "setupCommands": ["source ~/.bashrc"],
+              "moduleInitScripts": [
+                "/etc/profile",
+                "/etc/profile.d/modules.sh",
+                "/usr/share/lmod/lmod/init/bash"
+              ],
+              "setupCommands": [
+                "module --force purge",
+                "module load modtree/gpu",
+                "module use $HOME/privatemodules",
+                "module load conda-env/openclaw-py3.12"
+              ],
               "slurmDefaults": {
                 "partition": "ai",
                 "account": "lilly-ibil",
@@ -86,6 +110,20 @@ makes it easy to add more clusters later.
 Note: some clusters require GPU-per-node syntax. Use `gpusPerNode` (or `gres`)
 instead of `gpus` when required by the site policy.
 
+## Environment setup best practice
+
+Keep runtime bootstrapping in config, not prompts:
+
+- `moduleInitScripts`: candidate scripts for initializing `module` in non-login
+  shells.
+- `setupCommands`: module policy + environment activation for every run.
+- `loginShell`: when `true`, render jobs with `#!/bin/bash -l` for sites where
+  module setup is tied to login shell initialization.
+- `slurmDefaults.modules`: shared module loads for that profile.
+
+This keeps behavior deterministic across projects and avoids ad-hoc
+tool/prompt-level shell logic.
+
 ## Tool
 
 Enable this optional tool via `tools.allow` or `agents.list[].tools.allow`:
@@ -96,6 +134,10 @@ Enable this optional tool via `tools.allow` or `agents.list[].tools.allow`:
 
 Actions:
 
+- `run_workload` (high-level async submit)
+- `check_workload`
+- `fetch_workload_logs`
+- `download_workload_outputs`
 - `list_clusters`
 - `init_run`
 - `upload`
@@ -108,12 +150,18 @@ Actions:
 
 ## Example Workflow
 
-1. `init_run` for `gautschi`
-2. `upload` local scripts/data
-3. `render_job` using defaults + per-run overrides
-4. `submit_job` and capture job ID
-5. `job_status` until completion
-6. `job_logs` to inspect output
-7. `download` artifacts to workspace
+1. `run_workload` to submit (returns `runId` + `jobId` immediately)
+2. `check_workload` to inspect terminal/non-terminal state
+3. `fetch_workload_logs` for latest output
+4. `download_workload_outputs` for artifacts
+
+`run_workload` is strictly profile-managed for environment bootstrap.
+It rejects call-level `setupCommands`, `modules`, and `headerOverrides.modules`
+to prevent brittle ad-hoc runtime changes.
+
+For one-off debugging, use low-level `render_job` with
+`allowEnvOverrides=true`.
+
+Low-level actions remain available for debugging and explicit control.
 
 See `examples/gautschi/` for a synthetic NumPy job.

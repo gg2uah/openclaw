@@ -104,13 +104,30 @@ export class ClusterSlurmService {
       sshTarget: cluster.sshTarget,
       remoteRoot: cluster.remoteRoot,
       scheduler: cluster.scheduler,
+      loginShell: cluster.loginShell,
       slurmDefaults: cluster.slurmDefaults,
     }));
 
     return {
       defaultCluster: this.config.defaultCluster,
+      routing: this.config.routing,
       clusters,
     };
+  }
+
+  async getRunRecord(runId: string): Promise<ClusterRunRecord | undefined> {
+    return getRun(this.runsRoot, sanitizeRunId(runId));
+  }
+
+  private assertRunCluster(run: ClusterRunRecord | undefined, cluster: ClusterProfile): void {
+    if (!run) {
+      return;
+    }
+    if (run.clusterId !== cluster.id) {
+      throw new Error(
+        `runId ${run.runId} belongs to cluster "${run.clusterId}" (requested "${cluster.id}")`,
+      );
+    }
   }
 
   resolveCluster(clusterId?: string): ClusterProfile {
@@ -169,6 +186,7 @@ export class ClusterSlurmService {
   }) {
     const cluster = this.resolveCluster(params.cluster);
     const run = params.runId ? await getRun(this.runsRoot, sanitizeRunId(params.runId)) : undefined;
+    this.assertRunCluster(run, cluster);
 
     const candidates = [
       ...(params.localPath ? [params.localPath] : []),
@@ -217,13 +235,16 @@ export class ClusterSlurmService {
     if (params.runId && !run) {
       throw new Error(`Unknown runId: ${params.runId}`);
     }
+    this.assertRunCluster(run, cluster);
 
     const mergedHeader = mergeSlurmHeader(cluster.slurmDefaults, params.headerOverrides);
     const script = renderSlurmScript({
       header: mergedHeader,
       commands: params.commands,
       env: params.env,
+      loginShell: cluster.loginShell,
       modules: params.modules,
+      moduleInitScripts: cluster.moduleInitScripts,
       setupCommands: [...cluster.setupCommands, ...(params.setupCommands ?? [])],
     });
 
@@ -270,6 +291,7 @@ export class ClusterSlurmService {
     if (params.runId && !run) {
       throw new Error(`Unknown runId: ${params.runId}`);
     }
+    this.assertRunCluster(run, cluster);
 
     const localScriptPath = (() => {
       if (params.scriptPath) {
@@ -297,14 +319,8 @@ export class ClusterSlurmService {
       .filter((arg) => arg.length > 0)
       .map((arg) => shellQuote(arg));
 
-    const remoteSetup = cluster.setupCommands
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .join("\n");
-
     const remoteSubmitCommand = [
       "set -euo pipefail",
-      remoteSetup,
       `cd ${shellQuote(remoteDir)}`,
       `sbatch ${submitArgs.join(" ")} ${shellQuote(remoteScriptPath)}`.trim(),
     ]
@@ -392,14 +408,20 @@ export class ClusterSlurmService {
   }) {
     const cluster = this.resolveCluster(params.cluster);
     const tail = params.tail && params.tail > 0 ? Math.floor(params.tail) : 200;
+    const run = params.runId ? await getRun(this.runsRoot, sanitizeRunId(params.runId)) : undefined;
+    if (params.runId && !run) {
+      throw new Error(`Unknown runId: ${params.runId}`);
+    }
+    this.assertRunCluster(run, cluster);
 
     const remotePath = (() => {
       if (params.remotePath?.trim()) {
         return params.remotePath.trim();
       }
       if (params.runId?.trim() && params.jobId?.trim()) {
-        const safeRun = sanitizeRunId(params.runId.trim());
-        return toPosixRemotePath(cluster.remoteRoot, safeRun, `slurm-${params.jobId.trim()}.out`);
+        const runRoot =
+          run?.remoteRunDir ?? toPosixRemotePath(cluster.remoteRoot, run?.runId ?? "");
+        return toPosixRemotePath(runRoot, `slurm-${params.jobId.trim()}.out`);
       }
       throw new Error("remotePath is required (or provide runId + jobId)");
     })();

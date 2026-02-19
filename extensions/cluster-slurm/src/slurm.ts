@@ -1,5 +1,12 @@
 import type { SlurmHeader } from "./types.js";
 
+export const DEFAULT_MODULE_INIT_SCRIPTS = [
+  "/etc/profile",
+  "/etc/profile.d/modules.sh",
+  "/usr/share/lmod/lmod/init/bash",
+  "/usr/share/Modules/init/bash",
+];
+
 function formatDirective(flag: string, value: string | number | undefined): string[] {
   if (value == null || value === "") {
     return [];
@@ -31,12 +38,14 @@ export function renderSlurmScript(params: {
   env?: Record<string, string>;
   setupCommands?: string[];
   modules?: string[];
+  loginShell?: boolean;
+  moduleInitScripts?: string[];
 }): string {
   if (!params.commands || params.commands.length === 0) {
     throw new Error("At least one command is required to render a SLURM script");
   }
 
-  const lines: string[] = ["#!/bin/bash"];
+  const lines: string[] = [params.loginShell ? "#!/bin/bash -l" : "#!/bin/bash"];
   const h = params.header;
   if (h.gpus != null && h.gpusPerNode != null) {
     throw new Error("Set either gpus or gpusPerNode, not both");
@@ -74,23 +83,63 @@ export function renderSlurmScript(params: {
   const modules = Array.from(
     new Set([...(h.modules ?? []), ...(params.modules ?? [])].map((entry) => entry.trim())),
   ).filter((entry) => entry.length > 0);
+  const setupCommands = params.setupCommands ?? [];
+  const commands = params.commands;
+  const moduleInitScripts = Array.from(
+    new Set(
+      (params.moduleInitScripts ?? DEFAULT_MODULE_INIT_SCRIPTS)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    ),
+  );
+  const moduleCommandPattern = /^\s*(module|ml)\b/;
+  const needsModuleBootstrap =
+    modules.length > 0 ||
+    setupCommands.some((line) => moduleCommandPattern.test(line)) ||
+    commands.some((line) => moduleCommandPattern.test(line));
+
+  if (needsModuleBootstrap) {
+    lines.push("# Ensure the module command is available for non-login job shells.");
+    lines.push("if ! type module >/dev/null 2>&1; then");
+    if (moduleInitScripts.length > 0) {
+      lines.push(
+        `  for __openclaw_mod_init in ${moduleInitScripts.map((entry) => shellEscape(entry)).join(" ")}; do`,
+      );
+      lines.push('    if [ -r "$__openclaw_mod_init" ]; then');
+      lines.push("      # shellcheck disable=SC1090");
+      lines.push('      . "$__openclaw_mod_init" >/dev/null 2>&1 || true');
+      lines.push("      if type module >/dev/null 2>&1; then");
+      lines.push("        break");
+      lines.push("      fi");
+      lines.push("    fi");
+      lines.push("  done");
+    }
+    lines.push("fi");
+    lines.push("if ! type module >/dev/null 2>&1; then");
+    lines.push(
+      "  echo 'openclaw: module command unavailable; configure moduleInitScripts or setupCommands for this profile.' >&2",
+    );
+    lines.push("  exit 127");
+    lines.push("fi");
+    lines.push("");
+  }
 
   for (const mod of modules) {
     lines.push(`module load ${mod}`);
   }
 
-  for (const setup of params.setupCommands ?? []) {
+  for (const setup of setupCommands) {
     const trimmed = setup.trim();
     if (trimmed.length > 0) {
       lines.push(trimmed);
     }
   }
 
-  if (modules.length > 0 || (params.setupCommands?.length ?? 0) > 0) {
+  if (modules.length > 0 || setupCommands.length > 0) {
     lines.push("");
   }
 
-  for (const command of params.commands) {
+  for (const command of commands) {
     const trimmed = command.trim();
     if (trimmed.length > 0) {
       lines.push(trimmed);
