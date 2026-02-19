@@ -18,6 +18,8 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 - `run_workload` is profile-managed for environment bootstrap and rejects
   call-level `setupCommands`/`modules`; use low-level `render_job` with
   `allowEnvOverrides=true` only for explicit debugging.
+- If a job fails with `ModuleNotFoundError`, install packages inside the same
+  profile environment (do not add inline `module`/`conda activate` commands).
 
 ## Cluster selection
 
@@ -37,6 +39,20 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 4. `cluster_slurm` `download_workload_outputs`
 
 Low-level sequence (`init_run/upload/render_job/submit_job/...`) is still valid for debugging.
+
+## Missing package recovery
+
+When logs show `ModuleNotFoundError: No module named '<pkg>'`:
+
+1. Keep the same profile (`*-cpu` or `*-gpu`) so profile `setupCommands` load
+   the same environment.
+2. Submit an install workload using `run_workload` with commands such as:
+   - `python3 -m pip install <pkg>`
+   - `python3 -c "import <pkg>; print(<pkg>.__version__)"`
+3. Re-run the original workload.
+
+Use `python3 -m pip ...` as default. Use `conda install ...` only when a package
+specifically requires Conda and you accept slower solver/runtime behavior.
 
 ## Prompting template (for user messages)
 

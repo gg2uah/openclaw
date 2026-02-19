@@ -252,6 +252,35 @@ function toErrorText(error: unknown): string {
   return String(error);
 }
 
+function detectMissingPythonModule(logText: string): string | undefined {
+  const patterns = [
+    /ModuleNotFoundError:\s+No module named ['"]([^'"]+)['"]/i,
+    /ImportError:\s+No module named ['"]?([A-Za-z0-9_.-]+)['"]?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(logText);
+    const moduleName = match?.[1]?.trim();
+    if (moduleName) {
+      return moduleName;
+    }
+  }
+
+  return undefined;
+}
+
+function buildMissingPackageHint(moduleName: string, cluster: string) {
+  return {
+    module: moduleName,
+    strategy: "install-into-profile-env",
+    note: `Install with run_workload on cluster profile "${cluster}". The profile setupCommands already load the target environment.`,
+    suggestedCommands: [
+      `python3 -m pip install ${moduleName}`,
+      `python3 -c "import ${moduleName}; print(${moduleName}.__version__)"`,
+    ],
+  };
+}
+
 export function buildClusterSlurmTool(params: {
   config: ClusterSlurmConfig;
   workspaceDir: string;
@@ -447,6 +476,45 @@ export function buildClusterSlurmTool(params: {
       throw new Error("jobId is required (or provide remotePath directly)");
     }
 
+    if (!raw.remotePath?.trim() && run && jobId) {
+      const stdoutPath = path.posix.join(run.remoteRunDir, `slurm-${jobId}.out`);
+      const stderrPath = path.posix.join(run.remoteRunDir, `slurm-${jobId}.err`);
+      const [stdoutLogs, stderrLogs] = await Promise.all([
+        service.jobLogs({
+          cluster,
+          runId: run.runId,
+          remotePath: stdoutPath,
+          tail: raw.tail,
+        }),
+        service.jobLogs({
+          cluster,
+          runId: run.runId,
+          remotePath: stderrPath,
+          tail: raw.tail,
+        }),
+      ]);
+
+      const mergedLog = [stdoutLogs.log, stderrLogs.log]
+        .filter((entry) => entry.length > 0)
+        .join("\n");
+      const missingModule = detectMissingPythonModule(mergedLog);
+
+      return {
+        mode: "fetch_workload_logs",
+        runId: run.runId,
+        jobId,
+        cluster: stdoutLogs.cluster,
+        missing: stdoutLogs.missing && stderrLogs.missing,
+        log: mergedLog,
+        logs: {
+          stdout: stdoutLogs,
+          stderr: stderrLogs,
+        },
+        missingPackageHint:
+          missingModule && cluster ? buildMissingPackageHint(missingModule, cluster) : undefined,
+      };
+    }
+
     const logs = await service.jobLogs({
       cluster,
       runId: run?.runId ?? raw.runId,
@@ -455,11 +523,17 @@ export function buildClusterSlurmTool(params: {
       tail: raw.tail,
     });
 
+    const missingModule = detectMissingPythonModule(logs.log);
+
     return {
       mode: "fetch_workload_logs",
       runId: run?.runId,
       jobId,
       ...logs,
+      missingPackageHint:
+        missingModule && logs.cluster
+          ? buildMissingPackageHint(missingModule, logs.cluster)
+          : undefined,
     };
   }
 
@@ -499,7 +573,7 @@ export function buildClusterSlurmTool(params: {
     name: "cluster_slurm",
     label: "Cluster SLURM",
     description:
-      "Cluster orchestration over SSH for SLURM: submit asynchronous workloads, inspect status/logs, and retrieve artifacts using profile-driven routing.",
+      "Cluster orchestration over SSH for SLURM: submit asynchronous workloads, inspect status/logs (including missing-package hints), and retrieve artifacts using profile-driven routing.",
     parameters: ClusterSlurmToolSchema,
     async execute(_toolCallId: string, raw: ToolParams) {
       switch (raw.action) {

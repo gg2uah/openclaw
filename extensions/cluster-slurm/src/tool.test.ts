@@ -16,7 +16,10 @@ afterEach(async () => {
   );
 });
 
-function createToolRunner(options?: { cpuSubmitFailsWithGpuSignature?: boolean }) {
+function createToolRunner(options?: {
+  cpuSubmitFailsWithGpuSignature?: boolean;
+  stderrModuleNotFound?: string;
+}) {
   const calls: Array<{ command: string; args: string[] }> = [];
 
   const runner: CommandRunner = vi.fn(async (command, args) => {
@@ -37,6 +40,17 @@ function createToolRunner(options?: { cpuSubmitFailsWithGpuSignature?: boolean }
       }
 
       if (remoteCmd.includes("tail -n")) {
+        if (options?.stderrModuleNotFound && remoteCmd.includes(".err")) {
+          return {
+            code: 0,
+            stdout: `Traceback (most recent call last):
+  File "/tmp/job.py", line 1, in <module>
+    import ${options.stderrModuleNotFound}
+ModuleNotFoundError: No module named '${options.stderrModuleNotFound}'
+`,
+            stderr: "",
+          };
+        }
         return { code: 0, stdout: "line-1\nline-2\n", stderr: "" };
       }
 
@@ -348,5 +362,52 @@ describe("cluster-slurm tool", () => {
         allowEnvOverrides: true,
       }),
     ).resolves.toBeDefined();
+  });
+
+  it("returns missing-package hint when stderr reports ModuleNotFoundError", async () => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "cluster-slurm-missing-pkg-"));
+    tmpDirs.push(workspace);
+    await fs.writeFile(path.join(workspace, "analyze.py"), "print('ok')\n", "utf8");
+
+    const cfg = parseClusterSlurmConfig({
+      defaultCluster: "gautschi-cpu",
+      clusters: {
+        "gautschi-cpu": {
+          sshTarget: "cpu-host",
+          remoteRoot: "~/runs/cpu",
+        },
+      },
+    });
+
+    const { runner } = createToolRunner({ stderrModuleNotFound: "matplotlib" });
+    const tool = buildClusterSlurmTool({
+      config: cfg,
+      workspaceDir: workspace,
+      runner,
+    });
+
+    const started = detailsOf(
+      await tool.execute("tc12", {
+        action: "run_workload",
+        command: "python3 analyze.py",
+        localPath: "analyze.py",
+      }),
+    );
+    const runId = String(started.runId ?? "");
+
+    const logs = detailsOf(
+      await tool.execute("tc13", {
+        action: "fetch_workload_logs",
+        runId,
+      }),
+    );
+
+    const hint = logs.missingPackageHint as Record<string, unknown>;
+    expect(hint.module).toBe("matplotlib");
+    expect(hint.strategy).toBe("install-into-profile-env");
+    expect(Array.isArray(hint.suggestedCommands)).toBe(true);
+    expect((hint.suggestedCommands as string[]).join("\n")).toContain(
+      "python3 -m pip install matplotlib",
+    );
   });
 });

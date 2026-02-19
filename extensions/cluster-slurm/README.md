@@ -124,6 +124,20 @@ Keep runtime bootstrapping in config, not prompts:
 This keeps behavior deterministic across projects and avoids ad-hoc
 tool/prompt-level shell logic.
 
+### Missing package handling
+
+If a workload fails with `ModuleNotFoundError`, install the package using the
+same profile via `run_workload` (profile `setupCommands` will load the env
+first), for example:
+
+```bash
+python3 -m pip install matplotlib
+python3 -c "import matplotlib; print(matplotlib.__version__)"
+```
+
+Prefer `python3 -m pip ...` as default. Use `conda install ...` only when the
+package specifically needs Conda.
+
 ## Tool
 
 Enable this optional tool via `tools.allow` or `agents.list[].tools.allow`:
