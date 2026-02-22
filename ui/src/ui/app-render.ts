@@ -431,11 +431,36 @@ export function renderApp(state: AppViewState) {
                 includeGlobal: state.sessionsIncludeGlobal,
                 includeUnknown: state.sessionsIncludeUnknown,
                 basePath: state.basePath,
+                searchQuery: state.sessionsSearchQuery,
+                sortColumn: state.sessionsSortColumn,
+                sortDir: state.sessionsSortDir,
+                page: state.sessionsPage,
+                pageSize: state.sessionsPageSize,
+                actionsOpenKey: state.sessionsActionsOpenKey,
                 onFiltersChange: (next) => {
                   state.sessionsFilterActive = next.activeMinutes;
                   state.sessionsFilterLimit = next.limit;
                   state.sessionsIncludeGlobal = next.includeGlobal;
                   state.sessionsIncludeUnknown = next.includeUnknown;
+                },
+                onSearchChange: (q) => {
+                  state.sessionsSearchQuery = q;
+                  state.sessionsPage = 0;
+                },
+                onSortChange: (col, dir) => {
+                  state.sessionsSortColumn = col;
+                  state.sessionsSortDir = dir;
+                  state.sessionsPage = 0;
+                },
+                onPageChange: (p) => {
+                  state.sessionsPage = p;
+                },
+                onPageSizeChange: (s) => {
+                  state.sessionsPageSize = s;
+                  state.sessionsPage = 0;
+                },
+                onActionsOpenChange: (key) => {
+                  state.sessionsActionsOpenKey = key;
                 },
                 onRefresh: () => loadSessions(state),
                 onPatch: (key, patch) => patchSession(state, key, patch),
@@ -520,10 +545,6 @@ export function renderApp(state: AppViewState) {
                   error: state.agentSkillsError,
                   agentId: state.agentSkillsAgentId,
                   filter: state.skillsFilter,
-                },
-                sidebarFilter: state.agentsSidebarFilter,
-                onSidebarFilterChange: (value) => {
-                  state.agentsSidebarFilter = value;
                 },
                 onRefresh: async () => {
                   await loadAgents(state);
