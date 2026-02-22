@@ -253,6 +253,7 @@ export type AgentContext = {
   workspace: string;
   model: string;
   identityName: string;
+  identityEmoji: string;
   identityAvatar: string;
   skillsLabel: string;
   isDefault: boolean;
@@ -279,6 +280,7 @@ export function buildAgentContext(
     agent.name?.trim() ||
     config.entry?.name ||
     agent.id;
+  const identityEmoji = resolveAgentEmoji(agent, agentIdentity) || "—";
   const identityAvatar = resolveAgentAvatarUrl(agent, agentIdentity) ? "custom" : "—";
   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
   const skillCount = skillFilter?.length ?? null;
@@ -286,6 +288,7 @@ export function buildAgentContext(
     workspace,
     model: modelLabel,
     identityName,
+    identityEmoji,
     identityAvatar,
     skillsLabel: skillFilter ? `${skillCount} selected` : "all skills",
     isDefault: Boolean(defaultId && agent.id === defaultId),
