@@ -132,6 +132,9 @@ export function parseClusterSlurmConfig(value: unknown): ClusterSlurmConfig {
         autoFallbackToGpuOnSignatures: true,
         gpuRequiredErrorSignatures: [...DEFAULT_GPU_REQUIRED_ERROR_SIGNATURES],
       },
+      execution: {
+        allowCustomEnvOverride: false,
+      },
     };
   }
 
@@ -196,6 +199,9 @@ export function parseClusterSlurmConfig(value: unknown): ClusterSlurmConfig {
       : [...DEFAULT_GPU_REQUIRED_ERROR_SIGNATURES];
 
   const localRunsDir = readString(obj.localRunsDir, "localRunsDir") ?? DEFAULT_LOCAL_RUNS_DIR;
+  const executionObj = obj.execution == null ? undefined : asObject(obj.execution, "execution");
+  const allowCustomEnvOverride =
+    readBoolean(executionObj?.allowCustomEnvOverride, "execution.allowCustomEnvOverride") ?? false;
 
   return {
     defaultCluster,
@@ -207,6 +213,9 @@ export function parseClusterSlurmConfig(value: unknown): ClusterSlurmConfig {
       gpuIndicators,
       autoFallbackToGpuOnSignatures,
       gpuRequiredErrorSignatures,
+    },
+    execution: {
+      allowCustomEnvOverride,
     },
   };
 }

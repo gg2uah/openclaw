@@ -28,6 +28,9 @@ Features:
             "gpuIndicators": ["torch.cuda", "--device cuda", "jax[cuda]", "tensorflow-gpu"],
             "autoFallbackToGpuOnSignatures": true
           },
+          "execution": {
+            "allowCustomEnvOverride": false
+          },
           "localRunsDir": ".openclaw/cluster-runs",
           "clusters": {
             "gautschi-cpu": {
@@ -124,6 +127,15 @@ Keep runtime bootstrapping in config, not prompts:
 This keeps behavior deterministic across projects and avoids ad-hoc
 tool/prompt-level shell logic.
 
+Strict mode defaults to profile-managed environments:
+
+- Inline module/bootstrap commands are rejected in workload scripts.
+- Ad-hoc environment creation/activation (`conda create`, `python -m venv`,
+  `source .../bin/activate`) is rejected unless explicit override is enabled.
+- To permit one-off custom env creation for debugging, set
+  `execution.allowCustomEnvOverride=true` and call low-level `render_job` or
+  `run_workload` with `allowEnvOverrides=true`.
+
 ### Missing package handling
 
 If a workload fails with `ModuleNotFoundError`, install the package using the
@@ -173,8 +185,9 @@ Actions:
 It rejects call-level `setupCommands`, `modules`, and `headerOverrides.modules`
 to prevent brittle ad-hoc runtime changes.
 
-For one-off debugging, use low-level `render_job` with
-`allowEnvOverrides=true`.
+For one-off debugging, use low-level `render_job` (or `run_workload`) with
+`allowEnvOverrides=true` only when `execution.allowCustomEnvOverride=true` is
+set in config.
 
 Low-level actions remain available for debugging and explicit control.
 

@@ -168,14 +168,30 @@ function collectCommands(params: ToolParams): string[] {
   return merged;
 }
 
-const INLINE_ENV_BOOTSTRAP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+type CommandPattern = {
+  pattern: RegExp;
+  label: string;
+};
+
+const PROFILE_BOOTSTRAP_PATTERNS: CommandPattern[] = [
   { pattern: /^\s*(module|ml)\b/i, label: "module command" },
+];
+
+const CUSTOM_ENV_MUTATION_PATTERNS: CommandPattern[] = [
   { pattern: /^\s*source\s+activate\b/i, label: "source activate" },
-  { pattern: /^\s*conda\s+activate\b/i, label: "conda activate" },
+  { pattern: /^\s*(?:conda|mamba|micromamba)\s+activate\b/i, label: "conda activate" },
+  { pattern: /^\s*(?:conda|mamba|micromamba)\s+create\b/i, label: "conda create" },
+  { pattern: /^\s*(?:python(?:\d+(?:\.\d+)?)?)\s+-m\s+venv\b/i, label: "python -m venv" },
+  { pattern: /^\s*uv\s+venv\b/i, label: "uv venv" },
+  { pattern: /^\s*virtualenv\b/i, label: "virtualenv" },
+  { pattern: /^\s*source\s+.+\/bin\/activate(?:\s|$)/i, label: "source .../bin/activate" },
   { pattern: /^\s*eval\s+["']?\$\(\s*conda\s+shell\./i, label: "conda shell hook" },
 ];
 
-function detectInlineEnvBootstrap(commands: string[]): { label: string; line: string } | undefined {
+function detectCommandPattern(
+  commands: string[],
+  patterns: CommandPattern[],
+): { label: string; line: string } | undefined {
   for (const command of commands) {
     const lines = command.split(/\r?\n/);
     for (const line of lines) {
@@ -183,7 +199,7 @@ function detectInlineEnvBootstrap(commands: string[]): { label: string; line: st
       if (!trimmed) {
         continue;
       }
-      for (const candidate of INLINE_ENV_BOOTSTRAP_PATTERNS) {
+      for (const candidate of patterns) {
         if (candidate.pattern.test(trimmed)) {
           return { label: candidate.label, line: trimmed };
         }
@@ -191,6 +207,14 @@ function detectInlineEnvBootstrap(commands: string[]): { label: string; line: st
     }
   }
   return undefined;
+}
+
+function detectProfileBootstrap(commands: string[]) {
+  return detectCommandPattern(commands, PROFILE_BOOTSTRAP_PATTERNS);
+}
+
+function detectCustomEnvMutation(commands: string[]) {
+  return detectCommandPattern(commands, CUSTOM_ENV_MUTATION_PATTERNS);
 }
 
 function hasNonEmptyEntries(entries: string[] | undefined): boolean {
@@ -296,9 +320,10 @@ export function buildClusterSlurmTool(params: {
     const commands = collectCommands(raw);
     const localUploadPaths = collectLocalPaths(raw);
     const existingRun = raw.runId ? await service.getRunRecord(raw.runId) : undefined;
-    if (raw.allowEnvOverrides) {
+    const allowEnvOverrides = raw.allowEnvOverrides === true;
+    if (allowEnvOverrides && !params.config.execution.allowCustomEnvOverride) {
       throw new Error(
-        "run_workload does not support allowEnvOverrides. Configure environment bootstrap in the selected cluster profile.",
+        "run_workload allowEnvOverrides is disabled by cluster-slurm config (execution.allowCustomEnvOverride=false).",
       );
     }
 
@@ -309,11 +334,19 @@ export function buildClusterSlurmTool(params: {
       );
     }
 
-    const inlineEnvBootstrap = detectInlineEnvBootstrap(commands);
-    if (inlineEnvBootstrap) {
+    const profileBootstrap = detectProfileBootstrap(commands);
+    if (profileBootstrap) {
       throw new Error(
-        `run_workload rejected inline ${inlineEnvBootstrap.label} (${inlineEnvBootstrap.line}). Use profile setupCommands/moduleInitScripts in cluster config.`,
+        `run_workload rejected inline ${profileBootstrap.label} (${profileBootstrap.line}). Use profile setupCommands/moduleInitScripts in cluster config.`,
       );
+    }
+    if (!allowEnvOverrides) {
+      const customEnvMutation = detectCustomEnvMutation(commands);
+      if (customEnvMutation) {
+        throw new Error(
+          `run_workload rejected custom environment mutation (${customEnvMutation.label}: ${customEnvMutation.line}). Use profile-managed env by default, or set allowEnvOverrides=true with execution.allowCustomEnvOverride=true for explicit override.`,
+        );
+      }
     }
 
     const explicitCluster = raw.cluster?.trim();
@@ -393,7 +426,7 @@ export function buildClusterSlurmTool(params: {
         remoteRunDir: started.run.remoteRunDir,
         localScriptPath: started.rendered.localScriptPath,
         submitOutput: started.submitted.submitOutput,
-        allowEnvOverrides: false,
+        allowEnvOverrides,
         fallback: {
           triggered: false,
         },
@@ -428,7 +461,7 @@ export function buildClusterSlurmTool(params: {
         remoteRunDir: fallback.run.remoteRunDir,
         localScriptPath: fallback.rendered.localScriptPath,
         submitOutput: fallback.submitted.submitOutput,
-        allowEnvOverrides: false,
+        allowEnvOverrides,
         fallback: {
           triggered: true,
           fromCluster: primaryCluster,
@@ -603,17 +636,28 @@ export function buildClusterSlurmTool(params: {
         case "render_job": {
           const commands = collectCommands(raw);
           const allowEnvOverrides = raw.allowEnvOverrides === true;
+          if (allowEnvOverrides && !params.config.execution.allowCustomEnvOverride) {
+            throw new Error(
+              "render_job allowEnvOverrides is disabled by cluster-slurm config (execution.allowCustomEnvOverride=false).",
+            );
+          }
+          const profileBootstrap = detectProfileBootstrap(commands);
+          if (profileBootstrap) {
+            throw new Error(
+              `render_job rejected inline ${profileBootstrap.label} (${profileBootstrap.line}). Keep module/bootstrap in profile setupCommands.`,
+            );
+          }
           if (!allowEnvOverrides) {
-            const inlineEnvBootstrap = detectInlineEnvBootstrap(commands);
-            if (inlineEnvBootstrap) {
-              throw new Error(
-                `render_job rejected inline ${inlineEnvBootstrap.label} (${inlineEnvBootstrap.line}). Use profile setupCommands/moduleInitScripts, or set allowEnvOverrides=true for explicit override.`,
-              );
-            }
             const envOverrideFields = collectEnvOverrideFields(raw);
             if (envOverrideFields.length > 0) {
               throw new Error(
                 `render_job rejected call-level environment overrides (${envOverrideFields.join(", ")}). Use profile setupCommands/slurmDefaults.modules, or set allowEnvOverrides=true for explicit override.`,
+              );
+            }
+            const customEnvMutation = detectCustomEnvMutation(commands);
+            if (customEnvMutation) {
+              throw new Error(
+                `render_job rejected custom environment mutation (${customEnvMutation.label}: ${customEnvMutation.line}). Use profile-managed env by default, or set allowEnvOverrides=true with execution.allowCustomEnvOverride=true for explicit override.`,
               );
             }
           }

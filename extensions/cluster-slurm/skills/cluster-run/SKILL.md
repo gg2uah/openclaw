@@ -17,9 +17,13 @@ Use this skill when a task requires heavy compute (paper replication, model trai
 - Use routing defaults for CPU vs GPU; only ask when signals are ambiguous and high-risk.
 - `run_workload` is profile-managed for environment bootstrap and rejects
   call-level `setupCommands`/`modules`; use low-level `render_job` with
-  `allowEnvOverrides=true` only for explicit debugging.
+  `allowEnvOverrides=true` only for explicit debugging when
+  `execution.allowCustomEnvOverride=true` in cluster config.
 - If a job fails with `ModuleNotFoundError`, install packages inside the same
   profile environment (do not add inline `module`/`conda activate` commands).
+- Do not create/activate ad-hoc environments in normal runs. Custom env creation
+  (`conda create`, `python -m venv`, `source .../bin/activate`) is blocked
+  unless explicit override mode is enabled.
 
 ## Cluster selection
 

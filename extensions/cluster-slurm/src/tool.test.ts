@@ -264,7 +264,7 @@ describe("cluster-slurm tool", () => {
         localPath: "analyze.py",
         allowEnvOverrides: true,
       }),
-    ).rejects.toThrow(/does not support allowEnvOverrides/);
+    ).rejects.toThrow(/allowEnvOverrides is disabled by cluster-slurm config/);
 
     await expect(
       tool.execute("tc7c", {
@@ -307,6 +307,55 @@ describe("cluster-slurm tool", () => {
         localPath: "analyze.py",
       }),
     ).rejects.toThrow(/rejected inline module command/);
+
+    await expect(
+      tool.execute("tc8b", {
+        action: "run_workload",
+        command: "conda create -y -p /scratch/envs/test python=3.11\npython3 analyze.py",
+        localPath: "analyze.py",
+      }),
+    ).rejects.toThrow(/rejected custom environment mutation/);
+  });
+
+  it("allows custom environment mutation in run_workload only when explicit override is enabled", async () => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "cluster-slurm-run-override-"));
+    tmpDirs.push(workspace);
+    await fs.writeFile(path.join(workspace, "analyze.py"), "print('ok')\n", "utf8");
+
+    const cfg = parseClusterSlurmConfig({
+      defaultCluster: "gautschi-cpu",
+      clusters: {
+        "gautschi-cpu": {
+          sshTarget: "cpu-host",
+          remoteRoot: "~/runs/cpu",
+        },
+      },
+      execution: {
+        allowCustomEnvOverride: true,
+      },
+    });
+
+    const { runner } = createToolRunner();
+    const tool = buildClusterSlurmTool({
+      config: cfg,
+      workspaceDir: workspace,
+      runner,
+    });
+
+    const started = detailsOf(
+      await tool.execute("tc9", {
+        action: "run_workload",
+        command:
+          "conda create -y -p /scratch/envs/test python=3.11\nsource activate /scratch/envs/test\npython3 analyze.py",
+        localPath: "analyze.py",
+        allowEnvOverrides: true,
+      }),
+    );
+
+    expect(started.allowEnvOverrides).toBe(true);
+    const runScript = await fs.readFile(String(started.localScriptPath ?? ""), "utf8");
+    expect(runScript).toContain("conda create -y -p /scratch/envs/test python=3.11");
+    expect(runScript).toContain("source activate /scratch/envs/test");
   });
 
   it("applies explicit env override gating to render_job", async () => {
@@ -358,10 +407,40 @@ describe("cluster-slurm tool", () => {
     await expect(
       tool.execute("tc11", {
         action: "render_job",
-        command: "module load anaconda\npython3 app.py",
+        command: "python3 app.py",
         allowEnvOverrides: true,
       }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/allowEnvOverrides is disabled by cluster-slurm config/);
+
+    const cfgWithOverride = parseClusterSlurmConfig({
+      defaultCluster: "gautschi-cpu",
+      clusters: {
+        "gautschi-cpu": {
+          sshTarget: "cpu-host",
+          remoteRoot: "~/runs/cpu",
+        },
+      },
+      execution: {
+        allowCustomEnvOverride: true,
+      },
+    });
+    const toolWithOverride = buildClusterSlurmTool({
+      config: cfgWithOverride,
+      workspaceDir: workspace,
+      runner,
+    });
+
+    const rendered = detailsOf(
+      await toolWithOverride.execute("tc11b", {
+        action: "render_job",
+        command:
+          "conda create -y -p /scratch/envs/test python=3.11\nsource activate /scratch/envs/test\npython3 app.py",
+        allowEnvOverrides: true,
+      }),
+    );
+    const renderedScript = await fs.readFile(String(rendered.localScriptPath ?? ""), "utf8");
+    expect(renderedScript).toContain("conda create -y -p /scratch/envs/test python=3.11");
+    expect(renderedScript).toContain("source activate /scratch/envs/test");
   });
 
   it("returns missing-package hint when stderr reports ModuleNotFoundError", async () => {

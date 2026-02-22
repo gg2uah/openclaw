@@ -36,6 +36,7 @@ export type ClusterSlurmConfig = {
   localRunsDir: string;
   clusters: Record<string, ClusterProfile>;
   routing: ClusterRoutingConfig;
+  execution: ClusterExecutionConfig;
 };
 
 export type ClusterRoutingConfig = {
@@ -44,6 +45,10 @@ export type ClusterRoutingConfig = {
   gpuIndicators: string[];
   autoFallbackToGpuOnSignatures: boolean;
   gpuRequiredErrorSignatures: string[];
+};
+
+export type ClusterExecutionConfig = {
+  allowCustomEnvOverride: boolean;
 };
 
 export type ClusterRunJob = {

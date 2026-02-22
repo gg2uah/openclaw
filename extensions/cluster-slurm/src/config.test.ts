@@ -9,6 +9,7 @@ describe("cluster-slurm config", () => {
     expect(cfg.routing.defaultProfile).toBeUndefined();
     expect(cfg.routing.gpuIndicators.length).toBeGreaterThan(0);
     expect(cfg.routing.autoFallbackToGpuOnSignatures).toBe(true);
+    expect(cfg.execution.allowCustomEnvOverride).toBe(false);
   });
 
   it("parses a valid cluster profile", () => {
@@ -37,6 +38,7 @@ describe("cluster-slurm config", () => {
     expect(cfg.clusters.gautschi?.loginShell).toBe(true);
     expect(cfg.clusters.gautschi?.moduleInitScripts).toEqual(["/etc/profile.d/modules.sh"]);
     expect(cfg.routing.defaultProfile).toBe("gautschi");
+    expect(cfg.execution.allowCustomEnvOverride).toBe(false);
   });
 
   it("defaults loginShell to false", () => {
@@ -101,6 +103,9 @@ describe("cluster-slurm config", () => {
         autoFallbackToGpuOnSignatures: false,
         gpuRequiredErrorSignatures: ["cuda is required"],
       },
+      execution: {
+        allowCustomEnvOverride: true,
+      },
     });
 
     expect(cfg.routing.defaultProfile).toBe("gautschi-cpu");
@@ -108,6 +113,7 @@ describe("cluster-slurm config", () => {
     expect(cfg.routing.gpuIndicators).toEqual(["torch.cuda", "/--device\\s+cuda/i"]);
     expect(cfg.routing.autoFallbackToGpuOnSignatures).toBe(false);
     expect(cfg.routing.gpuRequiredErrorSignatures).toEqual(["cuda is required"]);
+    expect(cfg.execution.allowCustomEnvOverride).toBe(true);
   });
 
   it("fails when routing profile references a missing cluster", () => {
